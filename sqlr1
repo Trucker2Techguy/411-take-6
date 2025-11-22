@@ -1,0 +1,31 @@
+
+
+PS C:\Users\LabAdmin\Desktop\Requirements2> . 'C:\Users\LabAdmin\Desktop\Requirements2\Restore-AD.ps1'
+Active Directory module loaded successfully.
+
+Checking for existing OU 'Finance'...
+OU 'Finance' exists — removing protection and deleting...
+Creating OU 'Finance'...
+Importing users from CSV: C:\Users\LabAdmin\Desktop\Requirements2\financePersonnel.csv
+
+Verifying AD user entries...
+Verification complete. Results saved to ADResults.txt
+
+Restore-AD.ps1 execution complete.
+PS C:\Users\LabAdmin\Desktop\Requirements2>
+PS C:\Users\LabAdmin\Desktop\Requirements2> . 'C:\Users\LabAdmin\Desktop\Requirements2\Restore-SQL.ps1'
+SQL Server module loaded.
+
+Resetting database...
+VERBOSE: Creating new ClientDB
+Creating table...
+VERBOSE: Changed database context to 'ClientDB'.
+VERBOSE: Table created.
+Importing CSV...
+VERBOSE: Changed database context to 'ClientDB'.
+VERBOSE: Importing data from CSV: C:\Users\LabAdmin\Desktop\Requirements2\NewClientData.csv
+VERBOSE: Import complete.
+Exporting SQL results to SqlResults.txt
+
+SQL restore completed successfully.
+PS C:\Users\LabAdmin\Desktop\Requirements2>
