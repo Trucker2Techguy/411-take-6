@@ -1,0 +1,96 @@
+# Jaime Snyder - Student ID: 012423814
+# D411 Task 2 - Restore-SQL.ps1
+
+Import-Module SqlServer -DisableNameChecking
+Write-Host "SQL Server module loaded.`n"
+
+$Server = ".\SQLEXPRESS"
+$Database = "ClientDB"
+$CSVPath = "$PSScriptRoot\NewClientData.csv"
+$SqlResults = "$PSScriptRoot\SqlResults.txt"
+
+# ------------------------------
+# SQL SCRIPT 1: Reset DB
+# ------------------------------
+$SqlDbReset = @"
+IF DB_ID('ClientDB') IS NOT NULL
+BEGIN
+    PRINT 'Database exists — resetting...';
+    USE master;
+    ALTER DATABASE ClientDB SET SINGLE_USER WITH ROLLBACK IMMEDIATE;
+    DROP DATABASE ClientDB;
+END
+
+PRINT 'Creating new ClientDB';
+CREATE DATABASE ClientDB;
+"@
+
+# ------------------------------
+# SQL SCRIPT 2: Create Table
+# ------------------------------
+$SqlTableCreate = @"
+USE ClientDB;
+
+DECLARE @Client_A_Contacts VARCHAR(30)
+SET @Client_A_Contacts = 'Client_A_Contacts'
+
+IF EXISTS (SELECT * FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = @Client_A_Contacts)
+BEGIN
+    DROP TABLE dbo.Client_A_Contacts
+END
+
+CREATE TABLE Client_A_Contacts
+(
+    first_name varchar(30),
+    last_name varchar(30),
+    city varchar(30),
+    county varchar(30),
+    zip varchar(30),
+    officePhone varchar(30),
+    mobilePhone varchar(30)
+);
+
+PRINT 'Table created.';
+"@
+
+# ------------------------------
+# SQL SCRIPT 3: Import CSV
+# ------------------------------
+$SqlImport = @"
+USE ClientDB;
+
+PRINT 'Importing data from CSV: $CSVPath';
+
+BULK INSERT Client_A_Contacts
+FROM '$CSVPath'
+WITH (
+    FIRSTROW = 2,
+    FIELDTERMINATOR = ',',
+    ROWTERMINATOR = '\n'
+);
+
+PRINT 'Import complete.';
+"@
+
+try {
+    Write-Host "Resetting database..."
+    Invoke-Sqlcmd -ServerInstance $Server -Query $SqlDbReset -Verbose
+
+    Write-Host "Creating table..."
+    Invoke-Sqlcmd -ServerInstance $Server -Database $Database -Query $SqlTableCreate -Verbose
+
+    Write-Host "Importing CSV..."
+    Invoke-Sqlcmd -ServerInstance $Server -Database $Database -Query $SqlImport -Verbose
+
+    # ------------------------------
+    # Export verification output
+    # ------------------------------
+    Write-Host "Exporting SQL results to SqlResults.txt"
+    Invoke-Sqlcmd -ServerInstance $Server -Database $Database -Query "SELECT * FROM dbo.Client_A_Contacts" |
+        Out-File $SqlResults
+
+    Write-Host "`nSQL restore completed successfully."
+}
+catch {
+    Write-Host "A SQL error occurred: $($_.Exception.Message)"
+}
