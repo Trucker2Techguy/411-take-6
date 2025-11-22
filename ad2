@@ -1,0 +1,88 @@
+# Jaime Snyder - Student ID: 012423814
+# D411 Task 2 - Restore-AD.ps1
+
+Import-Module ActiveDirectory -ErrorAction Stop
+Write-Host "Active Directory module loaded successfully.`n"
+
+# Variables
+$OUName = "Finance"
+$OUPath = "OU=${OUName},DC=consultingfirm,DC=com"
+$CSVPath = "$PSScriptRoot\financePersonnel.csv"
+$ResultsFile = "$PSScriptRoot\ADResults.txt"
+
+# Begin results log
+"---- Active Directory Restore Log ----`n$(Get-Date)`n" | Out-File $ResultsFile
+
+try {
+    # --- B1: Check for existing OU ---
+    Write-Host "Checking for existing OU '$OUName'..."
+
+    if ([adsi]::Exists("LDAP://$OUPath")) {
+
+        Write-Host "OU '$OUName' exists — removing protection and deleting..."
+        Set-ADOrganizationalUnit -Identity $OUPath -ProtectedFromAccidentalDeletion $false
+        Remove-ADOrganizationalUnit -Identity $OUPath -Recursive -Confirm:$false
+
+        Add-Content $ResultsFile ("OU '{0}' existed and was deleted." -f $OUName)
+    }
+    else {
+        Write-Host "OU '$OUName' does not exist."
+        Add-Content $ResultsFile ("OU '{0}' did not exist." -f $OUName)
+    }
+
+    # --- Create new OU ---
+    Write-Host "Creating OU '$OUName'..."
+    New-ADOrganizationalUnit -Name $OUName -ProtectedFromAccidentalDeletion $false -Path "DC=consultingfirm,DC=com"
+    Add-Content $ResultsFile ("OU '{0}' created successfully.`n" -f $OUName)
+
+    # --- Import users from CSV ---
+    Write-Host "Importing users from CSV: $CSVPath"
+    $Users = Import-Csv -Path $CSVPath
+
+    foreach ($U in $Users) {
+
+        $First  = $U.First_Name
+        $Last   = $U.Last_Name
+        $Name   = "$First $Last"
+        $Sam    = $U.samAccount
+        $Postal = $U.PostalCode
+        $Office = $U.OfficePhone
+        $Mobile = $U.MobilePhone
+
+        try {
+            New-ADUser -GivenName $First `
+                       -Surname $Last `
+                       -Name $Name `
+                       -DisplayName $Name `
+                       -SamAccountName $Sam `
+                       -PostalCode $Postal `
+                       -OfficePhone $Office `
+                       -MobilePhone $Mobile `
+                       -Path $OUPath `
+                       -Enabled $true `
+                       -AccountPassword (ConvertTo-SecureString "P@ssword1" -AsPlainText -Force)
+
+            Add-Content $ResultsFile ("Created user: {0}" -f $Name)
+        }
+        catch {
+            Add-Content $ResultsFile ("Failed to create user {0}: {1}" -f $Name, $_.Exception.Message)
+        }
+    }
+
+    # --- B4: Verification Export ---
+    Write-Host "`nVerifying AD user entries..."
+    Add-Content $ResultsFile "`n---- OU User Verification ----"
+
+    Get-ADUser -Filter * -SearchBase $OUPath -Properties DisplayName,PostalCode,OfficePhone,MobilePhone |
+        Select-Object DisplayName, PostalCode, OfficePhone, MobilePhone |
+        Out-File -Append -FilePath $ResultsFile
+
+    Write-Host "Verification complete. Results saved to ADResults.txt"
+}
+catch {
+    $err = $_.Exception.Message
+    Write-Host "Error in script: $err"
+    Add-Content $ResultsFile ("Script Error: {0}" -f $err)
+}
+
+Write-Host "`nRestore-AD.ps1 execution complete."
